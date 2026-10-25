@@ -2,6 +2,33 @@ import {useRef,useState} from 'react';
 import {strFromU8,unzipSync} from 'fflate';
 
 const STORAGE='macos27-nev-packages';
+const SIGNATURE_PATH='META-INF/masos-signature.json';
+const TRUST_STORAGE='macos27-nev-trusted-certificates';
+const readTrust=()=>{try{const v=JSON.parse(localStorage.getItem(TRUST_STORAGE)||'[]');return Array.isArray(v)?v:[]}catch{return []}};
+const hex=bytes=>Array.from(new Uint8Array(bytes),b=>b.toString(16).padStart(2,'0')).join('');
+const fromB64=value=>Uint8Array.from(atob(value),c=>c.charCodeAt(0));
+async function verifySignedPackage(files){
+ const raw=files[SIGNATURE_PATH];
+ if(!raw)throw Error('paquete rechazado: no tiene firma digital .nev');
+ let signature;try{signature=JSON.parse(strFromU8(raw))}catch{throw Error('la firma digital del paquete esta dañada')}
+ if(signature.format!=='masos-nev-signature-1'||signature.algorithm!=='ECDSA-P256-SHA256'||!signature.certificate)throw Error('formato de firma .nev no compatible');
+ const cert=signature.certificate;
+ if(cert.format!=='masos-nev-cert-1'||cert.algorithm!=='ECDSA-P256-SHA256'||cert.fingerprint!==signature.fingerprint)throw Error('certificado de firma no valido');
+ const keyBytes=fromB64(cert.publicKey);
+ const fingerprint=hex(await crypto.subtle.digest('SHA-256',keyBytes));
+ if(fingerprint!==cert.fingerprint)throw Error('el fingerprint del certificado no coincide');
+ const trusted=readTrust().find(c=>c.fingerprint===cert.fingerprint);
+ if(!trusted)throw Error('certificado no confiable: importa y marca como confiable el archivo .nevcert.json del desarrollador antes de instalar');
+ const entries=Object.keys(files).filter(p=>!p.endsWith('/')&&p!==SIGNATURE_PATH).sort();
+ const chunks=[];
+ for(const path of entries){const hash=hex(await crypto.subtle.digest('SHA-256',files[path]));chunks.push(path+'\\0'+hash+'\\n')}
+ const data=new TextEncoder().encode(chunks.join(''));
+ const key=await crypto.subtle.importKey('spki',keyBytes,{name:'ECDSA',namedCurve:'P-256'},false,['verify']);
+ const valid=await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},key,fromB64(signature.signature),data);
+ if(!valid)throw Error('firma incorrecta: el paquete se ha modificado despues de firmarse');
+ return {name:cert.name,fingerprint:cert.fingerprint,signedAt:signature.signedAt};
+}
+
 const readInstalled=()=>{try{return JSON.parse(localStorage.getItem(STORAGE)||'[]')}catch{return []}};
 const textFile=(files,path)=>{const v=files[path];if(!v)return '';try{return strFromU8(v)}catch{return ''}};
 const toDataUrl=(bytes,path)=>{const ext=(path.split('.').pop()||'').toLowerCase();const mime=({png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',gif:'image/gif',svg:'image/svg+xml',ico:'image/x-icon'})[ext]||'application/octet-stream';let binary='';for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));return 'data:'+mime+';base64,'+btoa(binary)};
@@ -74,11 +101,12 @@ export default function NevInstaller({packages,onPackagesChange,onLaunch}){
  const remove=id=>{const next=packages.filter(p=>p.id!==id);localStorage.setItem(STORAGE,JSON.stringify(next));onPackagesChange(next);setMessage('paquete desinstalado');setError('')};
  return <div className="nev-installer">
   <div className="nev-hero"><div className="nev-mark">NEV</div><div><small>GESTOR DE PAQUETES</small><h1>instalador .nev</h1><p>instala aplicaciones empaquetadas para masOS</p></div></div>
+  <div className="nev-format"><b>certificados de desarrollador</b><p>solo se instalan paquetes firmados por un certificado que hayas marcado como confiable. importa el certificado publico del desarrollador; nunca compartas su clave privada.</p><button className="mac-button" onClick={()=>certInput.current?.click()}>Importar certificado .nevcert.json</button><input ref={certInput} type="file" accept=".json,.nevcert.json,application/json" hidden onChange={e=>{const file=e.target.files?.[0];if(file)importCert(file)}}/><div className="nev-trusted-list">{trusted.length?trusted.map(c=><article key={c.fingerprint}><div><b>{c.name}</b><small>SHA-256 · {c.fingerprint}</small></div><button className="nev-remove" onClick={()=>untrust(c.fingerprint)}>Dejar de confiar</button></article>):<small>no hay certificados de confianza importados</small>}</div></div>
   <div className="nev-drop"><div className="nev-file-icon">⇧</div><h2>instala un paquete</h2><p>selecciona un paquete .nev o un .zip que contenga el manifiesto y la carpeta sources/</p><button className="mac-button" disabled={busy} onClick={()=>input.current?.click()}>{busy?'Instalando…':'Seleccionar archivo .nev / .zip'}</button><input ref={input} type="file" accept=".nev,.zip,application/zip,application/x-zip-compressed,application/octet-stream" hidden onChange={e=>{const file=e.target.files?.[0];if(file)install(file)}}/><small>maximo 8 MB comprimido · 5 MB descomprimido</small></div>
   {error&&<div className="nev-alert error">{error}</div>}{message&&<div className="nev-alert">{message}</div>}
   <div className="nev-format"><b>estructura del paquete</b><pre>{'sources/\n  appe-data.txt  → nombre: Spotify logo: sources/appe-logo.png entrada: App.jsx formato: nev-1.0\n  appe-logo.png\n  App.jsx'}</pre></div>
   <div className="nev-installed-head"><h2>paquetes instalados</h2><span>{packages.length}</span></div>
-  {packages.length===0?<div className="nev-empty">todavia no has instalado ningun paquete .nev</div>:<div className="nev-package-list">{packages.map(p=><article key={p.id}>{p.logo?<img src={p.logo} alt=""/>:<div className="nev-package-logo">NEV</div>}<div className="nev-package-info"><b>{p.name}</b><small>{p.entry} · {p.format}</small><small>{p.description}</small></div><div className="nev-package-actions"><button className="get-button" onClick={()=>onLaunch(p)}>{p.launchable?'ABRIR':'ARCHIVOS'}</button><button className="nev-remove" onClick={()=>remove(p.id)}>Desinstalar</button></div></article>)}</div>}
-  <p className="nev-security">los paquetes se guardan en este navegador. las entradas JSX se renderizan en un entorno aislado con React y Babel; necesitan conexion a internet para cargar el runtime. las entradas HTML tambien se abren en un entorno aislado</p>
+  {packages.length===0?<div className="nev-empty">todavia no has instalado ningun paquete .nev</div>:<div className="nev-package-list">{packages.map(p=><article key={p.id}>{p.logo?<img src={p.logo} alt=""/>:<div className="nev-package-logo">NEV</div>}<div className="nev-package-info"><b>{p.name}</b><small>{p.entry} · {p.format}</small><small>{p.description}</small>{p.signature&&<small>✓ firma verificada · {p.signature.name}</small>}</div><div className="nev-package-actions"><button className="get-button" onClick={()=>onLaunch(p)}>{p.launchable?'ABRIR':'ARCHIVOS'}</button><button className="nev-remove" onClick={()=>remove(p.id)}>Desinstalar</button></div></article>)}</div>}
+  <p className="nev-security">firma requerida: ECDSA P-256 / SHA-256 · las firmas se verifican antes de instalar · la confianza de certificados se guarda en este navegador. los paquetes se guardan en este navegador. las entradas JSX se renderizan en un entorno aislado con React y Babel; necesitan conexion a internet para cargar el runtime. las entradas HTML tambien se abren en un entorno aislado</p>
  </div>;
 }
