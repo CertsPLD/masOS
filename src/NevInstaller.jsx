@@ -39,7 +39,7 @@ const normalize=(archiveFiles)=>{
  }
  if(!savedFiles[entryPath])savedFiles[entryPath]=textFile(files,entryPath);
  const description=pick('descripcion','description','resumen','summary')||'aplicacion instalada desde paquete .nev';
- const isHtml=/\.html?$/i.test(entryPath);
+ const isHtml=/\.html?$/i.test(entryPath);const isJsx=/\.(jsx|tsx)$/i.test(entryPath);
  if(isHtml){
   let html=savedFiles[entryPath]||'';
   const base=entryPath.includes('/')?entryPath.slice(0,entryPath.lastIndexOf('/')+1):'';
@@ -50,7 +50,7 @@ const normalize=(archiveFiles)=>{
   savedFiles[entryPath]=html;
  }
  const logo=logoPath?(savedFiles[logoPath]||''):'';
- return {id:'nev-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),name:String(name),logo,entry:entryPath,format:'nev-1.0',files:savedFiles,installedAt:new Date().toISOString(),description:String(description),launchable:isHtml};
+ return {id:'nev-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),name:String(name),logo,entry:entryPath,format:'nev-1.0',files:savedFiles,installedAt:new Date().toISOString(),description:String(description),launchable:isHtml||isJsx};
 };
 
 export default function NevInstaller({packages,onPackagesChange,onLaunch}){
@@ -79,6 +79,6 @@ export default function NevInstaller({packages,onPackagesChange,onLaunch}){
   <div className="nev-format"><b>estructura del paquete</b><pre>{'sources/\n  appe-data.txt  → nombre: Spotify logo: sources/appe-logo.png entrada: App.jsx formato: nev-1.0\n  appe-logo.png\n  App.jsx'}</pre></div>
   <div className="nev-installed-head"><h2>paquetes instalados</h2><span>{packages.length}</span></div>
   {packages.length===0?<div className="nev-empty">todavia no has instalado ningun paquete .nev</div>:<div className="nev-package-list">{packages.map(p=><article key={p.id}>{p.logo?<img src={p.logo} alt=""/>:<div className="nev-package-logo">NEV</div>}<div className="nev-package-info"><b>{p.name}</b><small>{p.entry} · {p.format}</small><small>{p.description}</small></div><div className="nev-package-actions"><button className="get-button" onClick={()=>onLaunch(p)}>{p.launchable?'ABRIR':'ARCHIVOS'}</button><button className="nev-remove" onClick={()=>remove(p.id)}>Desinstalar</button></div></article>)}</div>}
-  <p className="nev-security">los paquetes se guardan en este navegador. las entradas JSX se instalan como archivos fuente; para ejecutarlas como apps React, el paquete necesita una compilacion compatible. las entradas HTML se pueden abrir en un entorno aislado</p>
+  <p className="nev-security">los paquetes se guardan en este navegador. las entradas JSX se renderizan en un entorno aislado con React y Babel; necesitan conexion a internet para cargar el runtime. las entradas HTML tambien se abren en un entorno aislado</p>
  </div>;
 }
