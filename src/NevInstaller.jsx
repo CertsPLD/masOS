@@ -12,7 +12,7 @@ const normalize=(archiveFiles)=>{
  const roots=[...new Set(initialPaths.map(p=>p.split('/')[0]))];
  if(roots.length===1&&initialPaths.every(p=>p.includes('/'))){const root=roots[0]+'/';const stripped={};for(const path of initialPaths)stripped[path.slice(root.length)]=files[path];files=stripped}
  const paths=Object.keys(files).filter(p=>!p.endsWith('/'));
- const metaPath=paths.find(p=>/^(package|manifest|info)\.(nev|json|txt)$/i.test(p.split('/').pop()))||paths.find(p=>/^(package|manifest|info)\.(nev|json|txt)$/i.test(p.split('/').pop()?.replace(/^.*\//,'')));
+ const metaPath=paths.find(p=>/^sources\/appe-data\.txt$/i.test(p))||paths.find(p=>/^(package|manifest|info)\.(nev|json|txt)$/i.test(p.split('/').pop()));
  const raw=metaPath?textFile(files,metaPath):'';
  const meta=parseMeta(raw);
  const name=meta.nombre||meta.name||meta.title;
@@ -23,7 +23,8 @@ const normalize=(archiveFiles)=>{
  const sourcePrefix=paths.some(p=>p.startsWith('sources/'))?'sources/':'';
  const entryPath=entry.startsWith('sources/')?entry:sourcePrefix+entry;
  if(!files[entryPath])throw Error('no se encuentra el archivo de entrada '+entryPath);
- const logoPath=(meta.logo||'').startsWith('sources/')?meta.logo:sourcePrefix+(meta.logo||'');
+ const logoValue=meta.logo||'sources/appe-logo.png';
+ const logoPath=logoValue.startsWith('sources/')?logoValue:sourcePrefix+logoValue;
  const logo=logoPath&&files[logoPath]?toDataUrl(files[logoPath],logoPath):'';
  const savedFiles={};
  let total=0;
@@ -62,7 +63,7 @@ export default function NevInstaller({packages,onPackagesChange,onLaunch}){
   <div className="nev-hero"><div className="nev-mark">NEV</div><div><small>GESTOR DE PAQUETES</small><h1>instalador .nev</h1><p>instala aplicaciones empaquetadas para masOS</p></div></div>
   <div className="nev-drop"><div className="nev-file-icon">⇧</div><h2>instala un paquete</h2><p>selecciona un archivo .nev empaquetado como ZIP, con el manifiesto y la carpeta sources/</p><button className="mac-button" disabled={busy} onClick={()=>input.current?.click()}>{busy?'Instalando…':'Seleccionar paquete .nev'}</button><input ref={input} type="file" accept=".nev,application/zip" hidden onChange={e=>{const file=e.target.files?.[0];if(file)install(file)}}/><small>maximo 8 MB comprimido · 5 MB descomprimido</small></div>
   {error&&<div className="nev-alert error">{error}</div>}{message&&<div className="nev-alert">{message}</div>}
-  <div className="nev-format"><b>estructura compatible</b><pre>{'package.nev\nnombre: Spotify\nlogo: sources/logo.png\nentrada: App.jsx\nformato: nev-1.0\nsources/\n  App.jsx\n  logo.png\n  ...'}</pre><small>el manifiesto puede llamarse package.nev, manifest.nev, info.txt o package.json</small></div>
+  <div className="nev-format"><b>estructura compatible</b><pre>{'sources/appe-data.txt\nnombre: Spotify\nlogo: sources/appe-logo.png\nentrada: App.jsx\nformato: nev-1.0\nsources/\n  appe-data.txt\n  appe-logo.png\n  App.jsx\n  ...'}</pre><small>el manifiesto principal es sources/appe-data.txt y el logo predeterminado es sources/appe-logo.png</small></div>
   <div className="nev-installed-head"><h2>paquetes instalados</h2><span>{packages.length}</span></div>
   {packages.length===0?<div className="nev-empty">todavia no has instalado ningun paquete .nev</div>:<div className="nev-package-list">{packages.map(p=><article key={p.id}>{p.logo?<img src={p.logo} alt=""/>:<div className="nev-package-logo">NEV</div>}<div className="nev-package-info"><b>{p.name}</b><small>{p.entry} · {p.format}</small><small>{p.description}</small></div><div className="nev-package-actions"><button className="get-button" onClick={()=>onLaunch(p)}>{p.launchable?'ABRIR':'ARCHIVOS'}</button><button className="nev-remove" onClick={()=>remove(p.id)}>Desinstalar</button></div></article>)}</div>}
   <p className="nev-security">los paquetes se guardan en este navegador. las entradas JSX se instalan como archivos fuente; para ejecutarlas como apps React, el paquete necesita una compilacion compatible. las entradas HTML se pueden abrir en un entorno aislado</p>
