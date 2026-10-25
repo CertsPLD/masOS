@@ -12,7 +12,8 @@
     "@vitejs/plugin-react": "latest",
     "vite": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "fflate": "^0.8.2"
   },
   "devDependencies": {}
 }
