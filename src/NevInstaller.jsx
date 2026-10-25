@@ -7,10 +7,10 @@ const textFile=(files,path)=>{const v=files[path];if(!v)return '';try{return str
 const toDataUrl=(bytes,path)=>{const ext=(path.split('.').pop()||'').toLowerCase();const mime=({png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',gif:'image/gif',svg:'image/svg+xml',ico:'image/x-icon'})[ext]||'application/octet-stream';let binary='';for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));return 'data:'+mime+';base64,'+btoa(binary)};
 const parseMeta=raw=>{try{return JSON.parse(raw)}catch{}const out={};for(const line of raw.split(/\r?\n/)){const m=line.match(/^\s*([^:#]+)\s*:\s*(.*?)\s*$/);if(m)out[m[1].trim().toLowerCase()]=m[2].trim()}return out};
 const normalize=(archiveFiles)=>{
- let files=archiveFiles;
+ let files=Object.fromEntries(Object.entries(archiveFiles).filter(([path])=>!path.split('/').some(part=>part==='__MACOSX'||part==='.DS_Store'||part.startsWith('._'))));
  const initialPaths=Object.keys(files).filter(p=>!p.endsWith('/'));
  const roots=[...new Set(initialPaths.map(p=>p.split('/')[0]))];
- if(roots.length===1&&initialPaths.every(p=>p.includes('/'))){const root=roots[0]+'/';const stripped={};for(const path of initialPaths)stripped[path.slice(root.length)]=files[path];files=stripped}
+ if(roots.length===1&&roots[0].toLowerCase()!=='sources'&&initialPaths.every(p=>p.includes('/'))){const root=roots[0]+'/';const stripped={};for(const path of initialPaths)stripped[path.slice(root.length)]=files[path];files=stripped}
  const paths=Object.keys(files).filter(p=>!p.endsWith('/'));
  const metaPath=paths.find(p=>/^sources\/appe-data\.txt$/i.test(p))||paths.find(p=>/^(package|manifest|info)\.(nev|json|txt)$/i.test(p.split('/').pop()));
  const raw=metaPath?textFile(files,metaPath):'';
