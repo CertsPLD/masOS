@@ -27,7 +27,7 @@ export async function onRequest({ request, params }) {
     ? ["POST"]
     : route === "auth/logout"
       ? ["POST"]
-      : route === "auth/me" || method === "GET" && (dataRoute || developerRoute)
+      : route === "auth/me" || (method === "GET" && (dataRoute || developerRoute))
         ? ["GET"]
         : dataRoute && ["POST", "PUT"].includes(method)
           ? ["POST", "PUT"]
@@ -36,17 +36,27 @@ export async function onRequest({ request, params }) {
             : [];
 
   if (!allowedMethods.includes(method)) {
-    return Response.json({ error: "método no permitido" }, { status: 405 });
+    return Response.json({ error: "método no permitido" }, {
+      status: 405,
+      headers: { allow: allowedMethods.join(", "), "cache-control": "no-store" }
+    });
   }
 
   const upstreamUrl = new URL("/api/" + route, UPSTREAM);
   upstreamUrl.search = url.search;
 
   const headers = new Headers();
-  for (const name of ["accept", "content-type", "cookie"]) {
+  for (const name of ["accept", "content-type"]) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }
+
+  // Only forward Pine's own session cookie, never cookies belonging to masOS.
+  const pineCookie = (request.headers.get("cookie") || "")
+    .split(";")
+    .map(value => value.trim())
+    .find(value => value.startsWith("pine_session="));
+  if (pineCookie) headers.set("cookie", pineCookie);
 
   const init = { method, headers, redirect: "manual" };
   if (method !== "GET" && method !== "HEAD") init.body = request.body;
@@ -55,19 +65,25 @@ export async function onRequest({ request, params }) {
     const upstream = await fetch(upstreamUrl, init);
     const responseHeaders = new Headers(upstream.headers);
 
-    // The browser talks only to this site's origin. Keep Pine's session cookie
-    // HttpOnly and host-scoped to masOS; the proxy forwards it upstream.
+    // Re-scope Pine's HttpOnly cookie to this site's proxy route.
     const setCookie = responseHeaders.get("set-cookie");
     if (setCookie) {
-      responseHeaders.set(
-        "set-cookie",
-        setCookie.replace(/;\\s*Domain=[^;]+/i, "")
-      );
+      let cookie = setCookie
+        .replace(/;\s*Domain=[^;]+/i, "")
+        .replace(/;\s*Path=[^;]+/i, "; Path=/api/pine");
+      if (!/;\s*Path=/i.test(cookie)) cookie += "; Path=/api/pine";
+      responseHeaders.set("set-cookie", cookie);
     }
 
-    for (const name of ["access-control-allow-origin", "access-control-allow-credentials", "content-encoding", "content-length", "transfer-encoding", "connection"]) {
-      responseHeaders.delete(name);
-    }
+    for (const name of [
+      "access-control-allow-origin",
+      "access-control-allow-credentials",
+      "content-encoding",
+      "content-length",
+      "transfer-encoding",
+      "connection"
+    ]) responseHeaders.delete(name);
+
     responseHeaders.set("cache-control", "no-store");
     responseHeaders.set("vary", "Cookie");
 
@@ -77,6 +93,9 @@ export async function onRequest({ request, params }) {
       headers: responseHeaders
     });
   } catch {
-    return Response.json({ error: "no se pudo conectar con PineAccounts" }, { status: 502 });
+    return Response.json({ error: "no se pudo conectar con PineAccounts" }, {
+      status: 502,
+      headers: { "cache-control": "no-store" }
+    });
   }
 }
