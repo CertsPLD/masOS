@@ -6,7 +6,11 @@ const readInstalled=()=>{try{return JSON.parse(localStorage.getItem(STORAGE)||'[
 const textFile=(files,path)=>{const v=files[path];if(!v)return '';try{return strFromU8(v)}catch{return ''}};
 const toDataUrl=(bytes,path)=>{const ext=(path.split('.').pop()||'').toLowerCase();const mime=({png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',gif:'image/gif',svg:'image/svg+xml',ico:'image/x-icon'})[ext]||'application/octet-stream';let binary='';for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));return 'data:'+mime+';base64,'+btoa(binary)};
 const parseMeta=raw=>{try{return JSON.parse(raw)}catch{}const out={};for(const line of raw.split(/\r?\n/)){const m=line.match(/^\s*([^:#]+)\s*:\s*(.*?)\s*$/);if(m)out[m[1].trim().toLowerCase()]=m[2].trim()}return out};
-const normalize=(files)=>{
+const normalize=(archiveFiles)=>{
+ let files=archiveFiles;
+ const initialPaths=Object.keys(files).filter(p=>!p.endsWith('/'));
+ const roots=[...new Set(initialPaths.map(p=>p.split('/')[0]))];
+ if(roots.length===1&&initialPaths.every(p=>p.includes('/'))){const root=roots[0]+'/';const stripped={};for(const path of initialPaths)stripped[path.slice(root.length)]=files[path];files=stripped}
  const paths=Object.keys(files).filter(p=>!p.endsWith('/'));
  const metaPath=paths.find(p=>/^(package|manifest|info)\.(nev|json|txt)$/i.test(p.split('/').pop()))||paths.find(p=>/^(package|manifest|info)\.(nev|json|txt)$/i.test(p.split('/').pop()?.replace(/^.*\//,'')));
  const raw=metaPath?textFile(files,metaPath):'';
@@ -28,8 +32,8 @@ const normalize=(files)=>{
   const bytes=files[path];total+=bytes.length;
   if(total>5*1024*1024)throw Error('el paquete descomprimido supera el limite de 5 MB');
   const ext=(path.split('.').pop()||'').toLowerCase();
-  if(['jsx','js','tsx','ts','json','css','html','txt','md','svg','xml'].includes(ext)){try{savedFiles[path]=strFromU8(bytes)}catch{}}
-  else if(path===logoPath)savedFiles[path]=toDataUrl(bytes,path);
+  if(['jsx','js','tsx','ts','json','css','html','txt','md','svg','xml','yml','yaml','csv'].includes(ext)){try{savedFiles[path]=strFromU8(bytes)}catch{savedFiles[path]=toDataUrl(bytes,path)}}
+  else savedFiles[path]=toDataUrl(bytes,path);
  }
  if(!savedFiles[entryPath])savedFiles[entryPath]=textFile(files,entryPath);
  return {id:'nev-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),name:String(name),logo,entry:entryPath,format:'nev-1.0',files:savedFiles,installedAt:new Date().toISOString(),description:String(meta.descripcion||meta.description||'paquete .nev instalado'),launchable: /\.html?$/i.test(entryPath)};
