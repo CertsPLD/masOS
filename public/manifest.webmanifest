@@ -1,0 +1,10 @@
+{
+  "name": "masOS",
+  "short_name": "masOS",
+  "description": "Tu espacio digital",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#101116",
+  "theme_color": "#101116",
+  "icons": []
+}
