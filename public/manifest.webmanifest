@@ -1,10 +1,1 @@
-{
-  "name": "masOS",
-  "short_name": "masOS",
-  "description": "Tu espacio digital",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#101116",
-  "theme_color": "#101116",
-  "icons": []
-}
+{"name":"macOS 27","short_name":"macOS 27","description":"Experiencia de escritorio web macOS 27","start_url":"/","display":"standalone","background_color":"#29234c","theme_color":"#29234c","icons":[]}
