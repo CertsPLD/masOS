@@ -45,7 +45,7 @@ export default function NevInstaller({packages,onPackagesChange,onLaunch}){
  const install=async file=>{
   setBusy(true);setError('');setMessage('');
   try{
-   if(!file.name.toLowerCase().endsWith('.nev'))throw Error('selecciona un archivo con extension .nev');
+   if(!/\.(nev|zip)$/i.test(file.name))throw Error('selecciona un paquete .nev o un archivo .zip');
    if(file.size>8*1024*1024)throw Error('el archivo supera el limite de 8 MB');
    const bytes=new Uint8Array(await file.arrayBuffer());
    const unpacked=unzipSync(bytes);
@@ -61,7 +61,7 @@ export default function NevInstaller({packages,onPackagesChange,onLaunch}){
  const remove=id=>{const next=packages.filter(p=>p.id!==id);localStorage.setItem(STORAGE,JSON.stringify(next));onPackagesChange(next);setMessage('paquete desinstalado');setError('')};
  return <div className="nev-installer">
   <div className="nev-hero"><div className="nev-mark">NEV</div><div><small>GESTOR DE PAQUETES</small><h1>instalador .nev</h1><p>instala aplicaciones empaquetadas para masOS</p></div></div>
-  <div className="nev-drop"><div className="nev-file-icon">⇧</div><h2>instala un paquete</h2><p>selecciona un archivo .nev empaquetado como ZIP, con el manifiesto y la carpeta sources/</p><button className="mac-button" disabled={busy} onClick={()=>input.current?.click()}>{busy?'Instalando…':'Seleccionar paquete .nev'}</button><input ref={input} type="file" accept=".nev,application/zip" hidden onChange={e=>{const file=e.target.files?.[0];if(file)install(file)}}/><small>maximo 8 MB comprimido · 5 MB descomprimido</small></div>
+  <div className="nev-drop"><div className="nev-file-icon">⇧</div><h2>instala un paquete</h2><p>selecciona un paquete .nev o un .zip que contenga el manifiesto y la carpeta sources/</p><button className="mac-button" disabled={busy} onClick={()=>input.current?.click()}>{busy?'Instalando…':'Seleccionar archivo .nev / .zip'}</button><input ref={input} type="file" accept=".nev,.zip,application/zip,application/x-zip-compressed,application/octet-stream" hidden onChange={e=>{const file=e.target.files?.[0];if(file)install(file)}}/><small>maximo 8 MB comprimido · 5 MB descomprimido</small></div>
   {error&&<div className="nev-alert error">{error}</div>}{message&&<div className="nev-alert">{message}</div>}
   <div className="nev-format"><b>estructura compatible</b><pre>{'sources/appe-data.txt\nnombre: Spotify\nlogo: sources/appe-logo.png\nentrada: App.jsx\nformato: nev-1.0\nsources/\n  appe-data.txt\n  appe-logo.png\n  App.jsx\n  ...'}</pre><small>el manifiesto principal es sources/appe-data.txt y el logo predeterminado es sources/appe-logo.png</small></div>
   <div className="nev-installed-head"><h2>paquetes instalados</h2><span>{packages.length}</span></div>
