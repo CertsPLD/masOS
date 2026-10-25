@@ -12,7 +12,7 @@ const normalize=(archiveFiles)=>{
  const roots=[...new Set(initialPaths.map(p=>p.split('/')[0]))];
  if(roots.length===1&&roots[0].toLowerCase()!=='sources'&&initialPaths.every(p=>p.includes('/'))){const root=roots[0]+'/';const stripped={};for(const path of initialPaths)stripped[path.slice(root.length)]=files[path];files=stripped}
  const paths=Object.keys(files).filter(p=>!p.endsWith('/'));
- const metaPath=paths.find(p=>/^sources\\/appe-data\\.txt$/i.test(p))||paths.find(p=>/^(package|manifest|info)\\.(nev|json|txt)$/i.test(p.split('/').pop()))||paths.find(p=>/appe-data\\.txt$/i.test(p));
+ const metaPath=paths.find(p=>/^sources\/appe-data\.txt$/i.test(p))||paths.find(p=>/^(package|manifest|info)\.(nev|json|txt)$/i.test(p.split('/').pop()))||paths.find(p=>/appe-data\.txt$/i.test(p));
  const raw=metaPath?textFile(files,metaPath):'';
  const meta=parseMeta(raw);
  const pick=(...keys)=>{for(const key of keys){const found=Object.keys(meta).find(k=>k.toLowerCase()===key.toLowerCase());if(found&&meta[found]!=null&&String(meta[found]).trim())return String(meta[found]).trim()}return ''};
@@ -39,14 +39,14 @@ const normalize=(archiveFiles)=>{
  }
  if(!savedFiles[entryPath])savedFiles[entryPath]=textFile(files,entryPath);
  const description=pick('descripcion','description','resumen','summary')||'aplicacion instalada desde paquete .nev';
- const isHtml=/\\.html?$/i.test(entryPath);
+ const isHtml=/\.html?$/i.test(entryPath);
  if(isHtml){
   let html=savedFiles[entryPath]||'';
   const base=entryPath.includes('/')?entryPath.slice(0,entryPath.lastIndexOf('/')+1):'';
-  const resolvePath=src=>{const clean=decodeURIComponent(String(src||'').split(/[?#]/)[0]);if(!clean||/^(https?:|data:|blob:|#|\\/\\/)/i.test(clean))return null;const joined=(clean.startsWith('/')?'':base)+clean;const parts=[];for(const part of joined.split('/')){if(part==='.'||!part)continue;if(part==='..')parts.pop();else parts.push(part)}const normalized=parts.join('/');return savedFiles[normalized]?normalized:(savedFiles[clean]?clean:null)};
-  html=html.replace(/<link\\b([^>]*?)href=(["'])([^"']+)\\2([^>]*)>/gi,(tag,before,q,href,after)=>{if(!/stylesheet/i.test(before+' '+after))return tag;const path=resolvePath(href);return path?'<style>'+String(savedFiles[path]).replace(/<\\/style/gi,'<\\\\/style')+'</style>':tag});
-  html=html.replace(/<script\\b([^>]*?)src=(["'])([^"']+)\\2([^>]*)>\\s*<\\/script>/gi,(tag,attrs,q,src,tail)=>{const path=resolvePath(src);if(!path)return tag;const code=String(savedFiles[path]);return '<script'+attrs+tail+'>'+code.replace(/<\\/script/gi,'<\\\\/script')+'</script>'});
-  html=html.replace(/\\b(src|href)=(["'])([^"']+)\\2/gi,(attr,kind,q,value)=>{const path=resolvePath(value);if(!path)return attr;const ext=path.split('.').pop().toLowerCase();if(kind.toLowerCase()==='href'&&!['png','jpg','jpeg','gif','webp','svg','ico','woff','woff2','ttf'].includes(ext))return attr;const data=savedFiles[path];return data&&String(data).startsWith('data:')?kind+'='+q+data+q:attr});
+  const resolvePath=src=>{const clean=decodeURIComponent(String(src||'').split(/[?#]/)[0]);if(!clean||/^(https?:|data:|blob:|#|\/\/)/i.test(clean))return null;const joined=(clean.startsWith('/')?'':base)+clean;const parts=[];for(const part of joined.split('/')){if(part==='.'||!part)continue;if(part==='..')parts.pop();else parts.push(part)}const normalized=parts.join('/');return savedFiles[normalized]?normalized:(savedFiles[clean]?clean:null)};
+  html=html.replace(/<link\b([^>]*?)href=(["'])([^"']+)\2([^>]*)>/gi,(tag,before,q,href,after)=>{if(!/stylesheet/i.test(before+' '+after))return tag;const path=resolvePath(href);return path?'<style>'+String(savedFiles[path]).replace(/<\/style/gi,'<\\/style')+'</style>':tag});
+  html=html.replace(/<script\b([^>]*?)src=(["'])([^"']+)\2([^>]*)>\s*<\/script>/gi,(tag,attrs,q,src,tail)=>{const path=resolvePath(src);if(!path)return tag;const code=String(savedFiles[path]);return '<script'+attrs+tail+'>'+code.replace(/<\/script/gi,'<\\/script')+'</script>'});
+  html=html.replace(/\b(src|href)=(["'])([^"']+)\2/gi,(attr,kind,q,value)=>{const path=resolvePath(value);if(!path)return attr;const ext=path.split('.').pop().toLowerCase();if(kind.toLowerCase()==='href'&&!['png','jpg','jpeg','gif','webp','svg','ico','woff','woff2','ttf'].includes(ext))return attr;const data=savedFiles[path];return data&&String(data).startsWith('data:')?kind+'='+q+data+q:attr});
   savedFiles[entryPath]=html;
  }
  return {id:'nev-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),name:String(name),logo,entry:entryPath,format:'nev-1.0',files:savedFiles,installedAt:new Date().toISOString(),description:String(description),launchable:isHtml};
