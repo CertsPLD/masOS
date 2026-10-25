@@ -5,7 +5,7 @@ const STORAGE='macos27-nev-packages';
 const readInstalled=()=>{try{return JSON.parse(localStorage.getItem(STORAGE)||'[]')}catch{return []}};
 const textFile=(files,path)=>{const v=files[path];if(!v)return '';try{return strFromU8(v)}catch{return ''}};
 const toDataUrl=(bytes,path)=>{const ext=(path.split('.').pop()||'').toLowerCase();const mime=({png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',gif:'image/gif',svg:'image/svg+xml',ico:'image/x-icon'})[ext]||'application/octet-stream';let binary='';for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));return 'data:'+mime+';base64,'+btoa(binary)};
-const parseMeta=raw=>{try{return JSON.parse(raw)}catch{}const out={};for(const line of raw.split(/\r?\n/)){const m=line.match(/^\s*([^:#]+)\s*:\s*(.*?)\s*$/);if(m)out[m[1].trim().toLowerCase()]=m[2].trim()}return out};
+const parseMeta=raw=>{try{return JSON.parse(raw)}catch{}const out={};const source=String(raw||'').replace(/\r/g,' ').replace(/\n/g,' ');const keys=['nombre','name','title','app','aplicacion','aplicación','logo','icon','icono','image','entrada','entry','main','index','start','archivo principal','formato','format','descripcion','description','resumen','summary'];const escaped=keys.sort((a,b)=>b.length-a.length).map(k=>k.replace(/[.*+?^${}()|[\]\\]/g,'\\const parseMeta=raw=>{try{return JSON.parse(raw)}catch{}const out={};for(const line of raw.split(/\r?\n/)){const m=line.match(/^\s*([^:#]+)\s*:\s*(.*?)\s*$/);if(m)out[m[1].trim().toLowerCase()]=m[2].trim()}return out};')).join('|');const re=new RegExp('(?:^|\\s)('+escaped+')\\s*:\\s*(.*?)(?=\\s+(?:'+escaped+')\\s*:|$)','gi');let m;while((m=re.exec(source))){out[m[1].trim().toLowerCase()]=m[2].trim()}if(!Object.keys(out).length){for(const line of source.split(/\s+(?=[^:#]+\s*:)/)){const m=line.match(/^\s*([^:#]+)\s*:\s*(.*?)\s*$/);if(m)out[m[1].trim().toLowerCase()]=m[2].trim()}}return out};
 const normalize=(archiveFiles)=>{
  let files=Object.fromEntries(Object.entries(archiveFiles).filter(([path])=>!path.split('/').some(part=>part==='__MACOSX'||part==='.DS_Store'||part.startsWith('._'))));
  const initialPaths=Object.keys(files).filter(p=>!p.endsWith('/'));
@@ -16,7 +16,7 @@ const normalize=(archiveFiles)=>{
  const raw=metaPath?textFile(files,metaPath):'';
  const meta=parseMeta(raw);
  const pick=(...keys)=>{for(const key of keys){const found=Object.keys(meta).find(k=>k.toLowerCase()===key.toLowerCase());if(found&&meta[found]!=null&&String(meta[found]).trim())return String(meta[found]).trim()}return ''};
- const entry=pick('entrada','entry','main','index','start','archivo principal')||['sources/index.html','index.html','sources/main.html','main.html','sources/App.html','App.html'].find(p=>files[p])||'';
+ const entry=pick('entrada','entry','main','index','start','archivo principal')||['App.jsx','sources/App.jsx','index.html','sources/index.html','main.html','sources/main.html','App.html','sources/App.html'].find(p=>files[p])||'';
  const format=pick('formato','format')||'nev-1.0';
  const name=pick('nombre','name','title','app','aplicacion','aplicación')||'Aplicación .nev';
  if(format.toLowerCase()!=='nev-1.0')throw Error('formato no compatible: '+format+' (se esperaba nev-1.0)');
@@ -25,7 +25,7 @@ const normalize=(archiveFiles)=>{
  const entryPath=paths.includes(entry)?entry:paths.includes(sourcePrefix+entry)?sourcePrefix+entry:paths.find(p=>p.toLowerCase()===entry.toLowerCase())||paths.find(p=>p.toLowerCase()===(sourcePrefix+entry).toLowerCase());
  if(!entryPath||!files[entryPath])throw Error('no se encuentra el archivo de entrada '+entry);
  const logoValue=pick('logo','icon','icono','image')||'sources/appe-logo.png';
- const logoPath=paths.includes(logoValue)?logoValue:paths.includes(sourcePrefix+logoValue)?sourcePrefix+logoValue:paths.find(p=>p.toLowerCase()===logoValue.toLowerCase())||sourcePrefix+logoValue;
+ const logoPath=paths.includes(logoValue)?logoValue:paths.includes(sourcePrefix+logoValue)?sourcePrefix+logoValue:paths.find(p=>p.toLowerCase()===logoValue.toLowerCase())||'';
 
  const savedFiles={};
  let total=0;
@@ -49,6 +49,7 @@ const normalize=(archiveFiles)=>{
   html=html.replace(/\b(src|href)=(["'])([^"']+)\2/gi,(attr,kind,q,value)=>{const path=resolvePath(value);if(!path)return attr;const ext=path.split('.').pop().toLowerCase();if(kind.toLowerCase()==='href'&&!['png','jpg','jpeg','gif','webp','svg','ico','woff','woff2','ttf'].includes(ext))return attr;const data=savedFiles[path];return data&&String(data).startsWith('data:')?kind+'='+q+data+q:attr});
   savedFiles[entryPath]=html;
  }
+ const logo=logoPath?(savedFiles[logoPath]||''):'';
  return {id:'nev-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),name:String(name),logo,entry:entryPath,format:'nev-1.0',files:savedFiles,installedAt:new Date().toISOString(),description:String(description),launchable:isHtml};
 };
 
@@ -75,7 +76,7 @@ export default function NevInstaller({packages,onPackagesChange,onLaunch}){
   <div className="nev-hero"><div className="nev-mark">NEV</div><div><small>GESTOR DE PAQUETES</small><h1>instalador .nev</h1><p>instala aplicaciones empaquetadas para masOS</p></div></div>
   <div className="nev-drop"><div className="nev-file-icon">⇧</div><h2>instala un paquete</h2><p>selecciona un paquete .nev o un .zip que contenga el manifiesto y la carpeta sources/</p><button className="mac-button" disabled={busy} onClick={()=>input.current?.click()}>{busy?'Instalando…':'Seleccionar archivo .nev / .zip'}</button><input ref={input} type="file" accept=".nev,.zip,application/zip,application/x-zip-compressed,application/octet-stream" hidden onChange={e=>{const file=e.target.files?.[0];if(file)install(file)}}/><small>maximo 8 MB comprimido · 5 MB descomprimido</small></div>
   {error&&<div className="nev-alert error">{error}</div>}{message&&<div className="nev-alert">{message}</div>}
-  <div className="nev-format"><b>estructura compatible</b><pre>{'sources/appe-data.txt\nnombre: Spotify\nlogo: sources/appe-logo.png\nentrada: App.jsx\nformato: nev-1.0\nsources/\n  appe-data.txt\n  appe-logo.png\n  App.jsx\n  ...'}</pre><small>el manifiesto principal es sources/appe-data.txt y el logo predeterminado es sources/appe-logo.png</small></div>
+  <div className="nev-format"><b>estructura del paquete</b><pre>{'sources/\n  appe-data.txt\n  appe-logo.png\nApp.jsx\n\n# contenido de sources/appe-data.txt\nnombre: Spotify logo: sources/appe-logo.png entrada: App.jsx formato: nev-1.0'}</pre></div>
   <div className="nev-installed-head"><h2>paquetes instalados</h2><span>{packages.length}</span></div>
   {packages.length===0?<div className="nev-empty">todavia no has instalado ningun paquete .nev</div>:<div className="nev-package-list">{packages.map(p=><article key={p.id}>{p.logo?<img src={p.logo} alt=""/>:<div className="nev-package-logo">NEV</div>}<div className="nev-package-info"><b>{p.name}</b><small>{p.entry} · {p.format}</small><small>{p.description}</small></div><div className="nev-package-actions"><button className="get-button" onClick={()=>onLaunch(p)}>{p.launchable?'ABRIR':'ARCHIVOS'}</button><button className="nev-remove" onClick={()=>remove(p.id)}>Desinstalar</button></div></article>)}</div>}
   <p className="nev-security">los paquetes se guardan en este navegador. las entradas JSX se instalan como archivos fuente; para ejecutarlas como apps React, el paquete necesita una compilacion compatible. las entradas HTML se pueden abrir en un entorno aislado</p>
