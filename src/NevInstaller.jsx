@@ -12,20 +12,21 @@ const normalize=(archiveFiles)=>{
  const roots=[...new Set(initialPaths.map(p=>p.split('/')[0]))];
  if(roots.length===1&&roots[0].toLowerCase()!=='sources'&&initialPaths.every(p=>p.includes('/'))){const root=roots[0]+'/';const stripped={};for(const path of initialPaths)stripped[path.slice(root.length)]=files[path];files=stripped}
  const paths=Object.keys(files).filter(p=>!p.endsWith('/'));
- const metaPath=paths.find(p=>/^sources\/appe-data\.txt$/i.test(p))||paths.find(p=>/^(package|manifest|info)\.(nev|json|txt)$/i.test(p.split('/').pop()));
+ const metaPath=paths.find(p=>/^sources\\/appe-data\\.txt$/i.test(p))||paths.find(p=>/^(package|manifest|info)\\.(nev|json|txt)$/i.test(p.split('/').pop()))||paths.find(p=>/appe-data\\.txt$/i.test(p));
  const raw=metaPath?textFile(files,metaPath):'';
  const meta=parseMeta(raw);
- const name=meta.nombre||meta.name||meta.title;
- const entry=meta.entrada||meta.entry||meta.main||'App.jsx';
- const format=meta.formato||meta.format;
- if(!name)throw Error('falta «nombre» en el manifiesto del paquete');
- if(format!=='nev-1.0')throw Error('formato no compatible: se esperaba nev-1.0');
+ const pick=(...keys)=>{for(const key of keys){const found=Object.keys(meta).find(k=>k.toLowerCase()===key.toLowerCase());if(found&&meta[found]!=null&&String(meta[found]).trim())return String(meta[found]).trim()}return ''};
+ const entry=pick('entrada','entry','main','index','start','archivo principal')||['sources/index.html','index.html','sources/main.html','main.html','sources/App.html','App.html'].find(p=>files[p])||'';
+ const format=pick('formato','format')||'nev-1.0';
+ const name=pick('nombre','name','title','app','aplicacion','aplicación')||'Aplicación .nev';
+ if(format.toLowerCase()!=='nev-1.0')throw Error('formato no compatible: '+format+' (se esperaba nev-1.0)');
+ if(!entry)throw Error('no se encontró una entrada ejecutable; incluye index.html o indica entrada en sources/appe-data.txt');
  const sourcePrefix=paths.some(p=>p.startsWith('sources/'))?'sources/':'';
- const entryPath=entry.startsWith('sources/')?entry:sourcePrefix+entry;
- if(!files[entryPath])throw Error('no se encuentra el archivo de entrada '+entryPath);
- const logoValue=meta.logo||'sources/appe-logo.png';
- const logoPath=logoValue.startsWith('sources/')?logoValue:sourcePrefix+logoValue;
- const logo=logoPath&&files[logoPath]?toDataUrl(files[logoPath],logoPath):'';
+ const entryPath=paths.includes(entry)?entry:paths.includes(sourcePrefix+entry)?sourcePrefix+entry:paths.find(p=>p.toLowerCase()===entry.toLowerCase())||paths.find(p=>p.toLowerCase()===(sourcePrefix+entry).toLowerCase());
+ if(!entryPath||!files[entryPath])throw Error('no se encuentra el archivo de entrada '+entry);
+ const logoValue=pick('logo','icon','icono','image')||'sources/appe-logo.png';
+ const logoPath=paths.includes(logoValue)?logoValue:paths.includes(sourcePrefix+logoValue)?sourcePrefix+logoValue:paths.find(p=>p.toLowerCase()===logoValue.toLowerCase())||sourcePrefix+logoValue;
+
  const savedFiles={};
  let total=0;
  for(const path of paths){
@@ -37,7 +38,18 @@ const normalize=(archiveFiles)=>{
   else savedFiles[path]=toDataUrl(bytes,path);
  }
  if(!savedFiles[entryPath])savedFiles[entryPath]=textFile(files,entryPath);
- return {id:'nev-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),name:String(name),logo,entry:entryPath,format:'nev-1.0',files:savedFiles,installedAt:new Date().toISOString(),description:String(meta.descripcion||meta.description||'paquete .nev instalado'),launchable: /\.html?$/i.test(entryPath)};
+ const description=pick('descripcion','description','resumen','summary')||'aplicacion instalada desde paquete .nev';
+ const isHtml=/\\.html?$/i.test(entryPath);
+ if(isHtml){
+  let html=savedFiles[entryPath]||'';
+  const base=entryPath.includes('/')?entryPath.slice(0,entryPath.lastIndexOf('/')+1):'';
+  const resolvePath=src=>{const clean=decodeURIComponent(String(src||'').split(/[?#]/)[0]);if(!clean||/^(https?:|data:|blob:|#|\\/\\/)/i.test(clean))return null;const joined=(clean.startsWith('/')?'':base)+clean;const parts=[];for(const part of joined.split('/')){if(part==='.'||!part)continue;if(part==='..')parts.pop();else parts.push(part)}const normalized=parts.join('/');return savedFiles[normalized]?normalized:(savedFiles[clean]?clean:null)};
+  html=html.replace(/<link\\b([^>]*?)href=(["'])([^"']+)\\2([^>]*)>/gi,(tag,before,q,href,after)=>{if(!/stylesheet/i.test(before+' '+after))return tag;const path=resolvePath(href);return path?'<style>'+String(savedFiles[path]).replace(/<\\/style/gi,'<\\\\/style')+'</style>':tag});
+  html=html.replace(/<script\\b([^>]*?)src=(["'])([^"']+)\\2([^>]*)>\\s*<\\/script>/gi,(tag,attrs,q,src,tail)=>{const path=resolvePath(src);if(!path)return tag;const code=String(savedFiles[path]);return '<script'+attrs+tail+'>'+code.replace(/<\\/script/gi,'<\\\\/script')+'</script>'});
+  html=html.replace(/\\b(src|href)=(["'])([^"']+)\\2/gi,(attr,kind,q,value)=>{const path=resolvePath(value);if(!path)return attr;const ext=path.split('.').pop().toLowerCase();if(kind.toLowerCase()==='href'&&!['png','jpg','jpeg','gif','webp','svg','ico','woff','woff2','ttf'].includes(ext))return attr;const data=savedFiles[path];return data&&String(data).startsWith('data:')?kind+'='+q+data+q:attr});
+  savedFiles[entryPath]=html;
+ }
+ return {id:'nev-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),name:String(name),logo,entry:entryPath,format:'nev-1.0',files:savedFiles,installedAt:new Date().toISOString(),description:String(description),launchable:isHtml};
 };
 
 export default function NevInstaller({packages,onPackagesChange,onLaunch}){
