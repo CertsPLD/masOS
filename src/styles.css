@@ -66,3 +66,28 @@ button{cursor:pointer;touch-action:manipulation}
 .auth-error{border:1px solid #dc5c5c66;background:#dc5c5c14;color:#c33;padding:10px;border-radius:10px;font-size:11px;line-height:1.5;overflow-wrap:anywhere}
 .auth-foot{font-size:10px!important;line-height:1.6;letter-spacing:0!important;text-align:center;font-weight:400!important}
 @media(max-width:480px){.auth-dialog{padding:24px 19px;border-radius:20px}.auth-dialog h1{font-size:24px}}
+
+
+/* colorful, crisp application icons */
+.app-icon{display:grid!important;place-items:center;flex-shrink:0;overflow:hidden;position:relative;background:linear-gradient(145deg,var(--icon-a,#f5f7fa),var(--icon-b,#aeb8c6))!important;color:#fff!important;border:1px solid #ffffff75!important;box-shadow:inset 0 1px 1px #ffffff9c,inset 0 -8px 14px #00000012,0 4px 9px #00000020!important}
+.app-icon:before{content:"";position:absolute;inset:0;background:linear-gradient(125deg,#ffffff48,transparent 48%,#0000000a);pointer-events:none}
+.app-icon svg{position:relative;width:68%;height:68%;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 1px 1px #0002)}
+.app-icon.finder{--icon-a:#6ed0ff;--icon-b:#2768cf}
+.app-icon.safari{--icon-a:#64d9f4;--icon-b:#2460dc}
+.app-icon.notes{--icon-a:#fff5b5;--icon-b:#f3bd36;color:#765315!important}
+.app-icon.photos{--icon-a:#ff92b4;--icon-b:#6b65e9}
+.app-icon.music{--icon-a:#ff8caa;--icon-b:#d82365}
+.app-icon.calendar{--icon-a:#fff;--icon-b:#e8edf4;color:#e34c4c!important}
+.app-icon.settings{--icon-a:#bac6d4;--icon-b:#526274}
+.app-icon.store{--icon-a:#67d4f4;--icon-b:#3561df}
+.app-icon.terminal{--icon-a:#46515d;--icon-b:#111821}
+.app-icon.pine{--icon-a:#70d5a1;--icon-b:#13764c}
+.app-icon.reports{--icon-a:#83caff;--icon-b:#3862bd}
+.app-icon.mail{--icon-a:#78c8ff;--icon-b:#2465df}
+.app-icon.messages{--icon-a:#79f0a1;--icon-b:#12a65b}
+.app-icon.nevinstaller{--icon-a:#c6a7ff;--icon-b:#6744cb}
+.dock .app-icon{width:45px;height:45px;border-radius:13px}
+.desktop-icons .app-icon{width:54px;height:54px;border-radius:16px}
+.file-grid .app-icon,.launchpad .app-icon{width:48px;height:48px;border-radius:14px}
+.dock>button:hover .app-icon{box-shadow:inset 0 1px 1px #ffffff9c,0 8px 18px #0003!important}
+@media(max-width:760px){.dock .app-icon{width:31px;height:31px;border-radius:9px}.desktop-icons .app-icon{width:40px;height:40px}.file-grid .app-icon,.launchpad .app-icon{width:41px;height:41px}}
