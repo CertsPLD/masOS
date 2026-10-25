@@ -21,7 +21,7 @@ async function verifySignedPackage(files){
  if(!trusted)throw Error('certificado no confiable: importa y marca como confiable el archivo .nevcert.json del desarrollador antes de instalar');
  const entries=Object.keys(files).filter(p=>!p.endsWith('/')&&p!==SIGNATURE_PATH).sort();
  const chunks=[];
- for(const path of entries){const hash=hex(await crypto.subtle.digest('SHA-256',files[path]));chunks.push(path+'\\0'+hash+'\\n')}
+ for(const path of entries){const hash=hex(await crypto.subtle.digest('SHA-256',files[path]));chunks.push(path+'\0'+hash+'\n')}
  const data=new TextEncoder().encode(chunks.join(''));
  const key=await crypto.subtle.importKey('spki',keyBytes,{name:'ECDSA',namedCurve:'P-256'},false,['verify']);
  const valid=await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},key,fromB64(signature.signature),data);
