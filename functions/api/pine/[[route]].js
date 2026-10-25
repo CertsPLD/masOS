@@ -1,4 +1,4 @@
-const UPSTREAM = "https://accounts.pine.com";
+const UPSTREAM = "https://pineaccounts.pages.dev";
 
 export async function onRequest({ request, params }) {
   const routeValue = params?.route;
@@ -51,12 +51,14 @@ export async function onRequest({ request, params }) {
     if (value) headers.set(name, value);
   }
 
-  // Only forward Pine's own session cookie, never cookies belonging to masOS.
-  const pineCookie = (request.headers.get("cookie") || "")
+  // Forward only cookies namespaced by this proxy. This keeps masOS cookies
+  // private while allowing PineAccounts to use whichever session-cookie name it sets.
+  const pineCookies = (request.headers.get("cookie") || "")
     .split(";")
     .map(value => value.trim())
-    .find(value => value.startsWith("pine_session="));
-  if (pineCookie) headers.set("cookie", pineCookie);
+    .filter(value => value.startsWith("pine_proxy_"))
+    .map(value => value.slice("pine_proxy_".length));
+  if (pineCookies.length) headers.set("cookie", pineCookies.join("; "));
 
   const init = { method, headers, redirect: "manual" };
   if (method !== "GET" && method !== "HEAD") init.body = request.body;
@@ -65,14 +67,20 @@ export async function onRequest({ request, params }) {
     const upstream = await fetch(upstreamUrl, init);
     const responseHeaders = new Headers(upstream.headers);
 
-    // Re-scope Pine's HttpOnly cookie to this site's proxy route.
-    const setCookie = responseHeaders.get("set-cookie");
-    if (setCookie) {
-      let cookie = setCookie
-        .replace(/;\s*Domain=[^;]+/i, "")
-        .replace(/;\s*Path=[^;]+/i, "; Path=/api/pine");
-      if (!/;\s*Path=/i.test(cookie)) cookie += "; Path=/api/pine";
-      responseHeaders.set("set-cookie", cookie);
+    // Namespace Pine's cookies so they never collide with masOS cookies.
+    const setCookies = typeof responseHeaders.getSetCookie === "function"
+      ? responseHeaders.getSetCookie()
+      : (responseHeaders.get("set-cookie") ? [responseHeaders.get("set-cookie")] : []);
+    if (setCookies.length) {
+      responseHeaders.delete("set-cookie");
+      for (const original of setCookies) {
+        let cookie = original
+          .replace(/^([^=;]+)=/, (_, name) => "pine_proxy_" + name + "=")
+          .replace(/;\s*Domain=[^;]+/ig, "")
+          .replace(/;\s*Path=[^;]+/i, "; Path=/api/pine");
+        if (!/;\s*Path=/i.test(cookie)) cookie += "; Path=/api/pine";
+        responseHeaders.append("set-cookie", cookie);
+      }
     }
 
     for (const name of [
