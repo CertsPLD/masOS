@@ -93,3 +93,13 @@ button{cursor:pointer;touch-action:manipulation}
 @media(max-width:760px){.dock .app-icon{width:31px;height:31px;border-radius:9px}.desktop-icons .app-icon{width:40px;height:40px}.file-grid .app-icon,.launchpad .app-icon{width:41px;height:41px}}
 
 .nev-running-app{height:100%;min-height:0;display:flex;flex-direction:column;background:var(--panel)}.nev-running-header{display:flex;align-items:center;gap:10px;padding:9px 13px;border-bottom:1px solid var(--line);flex-shrink:0}.nev-running-header .nev-view-logo{width:30px;height:30px;border-radius:8px}.nev-running-header b{font-size:12px}.nev-running-header small{margin-left:auto;font-size:10px;color:var(--muted)}.nev-running-app .nev-preview-frame{display:block;flex:1;height:100%;min-height:0}
+
+
+/* masOS .nev signing and developer trust */
+.nev-trusted-list{display:grid;gap:8px;margin-top:12px}
+.nev-trusted-list article{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px;border:1px solid var(--line,#8883);border-radius:12px;background:var(--panel,#fff)}
+.nev-trusted-list article>div{min-width:0;display:grid;gap:4px}
+.nev-trusted-list article b{font-size:12px}
+.nev-trusted-list article small{font-size:10px;color:var(--muted,#777);overflow-wrap:anywhere}
+.nev-format>p{font-size:12px;line-height:1.6;color:var(--muted,#777)}
+.nev-package-info>small:last-child{color:#168653}
